@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/nexryai/selinspect/internal/policy"
-	"github.com/nexryai/selinspect/internal/procfs"
-	"github.com/nexryai/selinspect/internal/selinux"
+	"github.com/nexryai/selinspect/internal/tui"
 )
 
 const version = "0.1.0-dev"
@@ -20,8 +20,12 @@ func main() {
 	}
 }
 func run() error {
+	opts := tui.Options{}
 	versionFlag := flag.Bool("version", false, "print version")
-	flag.Bool("no-color", false, "disable color (core diagnostic output is monochrome)")
+	flag.BoolVar(&opts.NoColor, "no-color", false, "monochrome terminal output")
+	flag.IntVar(&opts.PID, "pid", 0, "highlight a running PID")
+	flag.StringVar(&opts.Type, "type", "", "open an existing policy Type")
+	policyFile := flag.String("policy", "", "inspect an offline binary policy (separate from live labels)")
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "selinspect — read-only SELinux relationship explorer\n\nUsage: selinspect [options]")
 		flag.PrintDefaults()
@@ -34,23 +38,16 @@ func run() error {
 	if flag.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments; use --help")
 	}
+	if *policyFile != "" && opts.PID != 0 {
+		return fmt.Errorf("--policy and --pid cannot be combined")
+	}
 	ctx := context.Background()
-	fmt.Println("SELinux:", selinux.Enforcement())
-	processes, err := (procfs.Source{}).List(ctx)
+	backend, err := policy.New(ctx, *policyFile)
+	diagnostics := ""
 	if err != nil {
-		return err
+		diagnostics = err.Error()
+		backend = nil
 	}
-	fmt.Printf("Process inventory: %d entries\n", len(processes))
-	backend, err := policy.New(ctx, "")
-	if err != nil {
-		fmt.Println(err)
-		return nil
-	}
-	types, err := backend.Types(ctx)
-	if err != nil {
-		fmt.Println("Limited mode:", err)
-		return nil
-	}
-	fmt.Printf("Policy Types: %d\n", len(types))
-	return nil
+	_, err = tea.NewProgram(tui.New(backend, opts, diagnostics)).Run()
+	return err
 }

@@ -27,3 +27,18 @@ go build ./cmd/selinspect
 Fixture tests do not need SELinux or root. Live integration must discover installed symbols first; no Docker or custom policy is required.
 
 The phase 0 executable reports enforcement, process count and backend availability. `go run ./cmd/selinspect --help` and `--version` are available. Interactive navigation follows in the next milestone.
+
+## Interactive process and policy browser
+
+```sh
+go build ./cmd/selinspect
+./selinspect
+./selinspect --pid PID
+./selinspect --type EXISTING_TYPE
+./selinspect --policy /absolute/path/to/policy.bin --type EXISTING_TYPE
+./selinspect --no-color
+```
+
+`1` opens processes, `2` Types and `3` Attributes. Use arrows or `j/k`, `Enter` to expand, `/` to filter, `Tab` to switch list/details, `PgUp/PgDn` to page, `g` to group processes by domain, `r` to refresh, `Esc` to cancel/back, `?` for help, and `q` to quit. At widths below 100 columns, Tab switches the visible pane. All output works in monochrome; control sequences from external names/output are stripped. `:type NAME` and `:attribute NAME` open a symbol directly. Entering an Attribute lists its complete membership with pagination; entering a member Type lists all its independent memberships.
+
+The process view includes PID, Linux numeric UID, name, domain and details including PPID, GID, kernel-thread flag and start ticks. Process reads are rechecked for PID reuse. Refresh preserves PID + start-tick identity. Unreadable labels stay unavailable. Queries run asynchronously; canceled and stale responses cannot replace a newer view. No policy query runs per PID during inventory. Offline policy starts in Types; its banner explicitly distinguishes policy-file findings from host contexts.
